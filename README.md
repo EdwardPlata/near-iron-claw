@@ -16,6 +16,9 @@ See [`SPEC.md`](SPEC.md) for the full spec kit and acceptance criteria.
   repository map, the data model, local dev, and **how to design and ship a new feature**.
 - [`SPEC.md`](SPEC.md) — requirements & acceptance criteria · [`CONNECTING.md`](CONNECTING.md) —
   raw connection facts · [`DEPLOY.md`](DEPLOY.md) — the deployed Supabase + Vercel stack.
+- **[`FEATURE.md`](FEATURE.md) + [`ROADMAP.md`](ROADMAP.md)** — the **Pipeline Creator API**: a
+  FastAPI service that designs LLM-powered data pipelines from Apify + custom ingestion channels
+  (`pip install -e ".[api]"` → `uvicorn near_iron_claw.pipeline.api:app`).
 
 ## Install
 

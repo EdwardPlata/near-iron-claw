@@ -23,10 +23,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "ruff>=0.5",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2",
 ]
 
 [project.urls]
@@ -53,4 +61,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-ignore = ["E741"]  # ambiguous var name (we use a local `mark` lambda intentionally)
+ignore = [
+    "E741",   # ambiguous var name (we use a local `mark` lambda intentionally)
+    "UP007",  # `X | Y` unions — project targets py3.9 where pydantic can't eval PEP-604 at runtime
+    "UP045",  # `X | None` — same reason
+]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's Depends()/Query() defaults are the framework's intended pattern.
+"src/near_iron_claw/pipeline/api.py" = ["B008"]

@@ -69,6 +69,18 @@ pattern condensed into one class, `NearAIClient`.
 | [`src/near_iron_claw/cli.py`](src/near_iron_claw/cli.py) | argparse CLI: `config` / `models` / `chat` / `verify` (+ `--json`, `--stream`). |
 | [`src/near_iron_claw/__main__.py`](src/near_iron_claw/__main__.py) | Enables `python -m near_iron_claw`. |
 
+### Pipeline Creator API (feature)
+Design: [`FEATURE.md`](FEATURE.md) · [`ROADMAP.md`](ROADMAP.md). Run: `uvicorn near_iron_claw.pipeline.api:app`.
+
+| Path | What it does |
+|------|--------------|
+| [`src/near_iron_claw/pipeline/api.py`](src/near_iron_claw/pipeline/api.py) | FastAPI app: `POST /v1/pipelines`, `…/dry-run`, `GET /v1/channels`, `/health`. |
+| [`src/near_iron_claw/pipeline/models.py`](src/near_iron_claw/pipeline/models.py) | Pydantic models: channels, whitelisted transforms, `PipelineSpec`, envelopes. |
+| [`src/near_iron_claw/pipeline/connectors.py`](src/near_iron_claw/pipeline/connectors.py) | Apify + custom-http ingestion (SSRF-guarded). |
+| [`src/near_iron_claw/pipeline/designer.py`](src/near_iron_claw/pipeline/designer.py) | LLM → validated `PipelineSpec`, with repair + deterministic degrade. |
+| [`src/near_iron_claw/pipeline/transforms.py`](src/near_iron_claw/pipeline/transforms.py) | Safe declarative transform executor (no `eval`). |
+| [`src/near_iron_claw/pipeline/store.py`](src/near_iron_claw/pipeline/store.py) | Pipeline store (in-memory MVP). |
+
 ### Tests
 | Path | What it covers |
 |------|----------------|

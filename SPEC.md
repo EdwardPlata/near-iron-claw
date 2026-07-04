@@ -80,3 +80,57 @@ works against any slug the gateway exposes (`anthropic/claude-*`, `openai/gpt-*`
 - The key committed at setup returns **HTTP 401** on `/chat/completions`
   (`api.near.ai` was retired 2025-10-31 → 410). A valid dashboard key from
   <https://cloud.near.ai> is required for live calls; the code degrades gracefully without one.
+
+---
+
+# Feature: Pipeline Creator API (v1)
+
+Detailed design in [`FEATURE.md`](FEATURE.md); phased plan in [`ROADMAP.md`](ROADMAP.md).
+
+## F1. Purpose
+A **FastAPI** service that turns a natural-language ingestion goal + a source **ingestion
+channel** (an [Apify](https://apify.com) actor/dataset, or the user's own HTTP endpoint) into a
+**structured, executable data pipeline** designed by the LLM on NEAR AI Cloud (via
+[`NearAIClient`](src/near_iron_claw/client.py)). It also dry-runs the pipeline against a sample.
+
+## F2. Goals
+- **FG1** — `POST /v1/pipelines`: given `{goal, channel}`, the LLM designs an ordered
+  extract→transform→load `PipelineSpec` (validated JSON), persisted with an id.
+- **FG2** — Pluggable **ingestion connectors**: `apify` and `custom-http` out of the box, behind
+  one interface so users can add their own channels.
+- **FG3** — `POST /v1/pipelines/{id}/run` (dry-run): fetch a bounded sample from the channel and
+  apply the pipeline's **declarative** transforms; return the sample + record count.
+- **FG4** — `GET /v1/channels`, `GET /v1/pipelines`, `GET /v1/pipelines/{id}`, `GET /health`.
+- **FG5** — **Graceful degradation**: if the LLM key is unavailable, fall back to a deterministic
+  rule-based pipeline and flag `degraded: true` (mirrors the deployed stack's behavior).
+
+## F3. Non-goals (v1)
+- Scheduling / recurring runs, durable orchestration, or a UI (see [`ROADMAP.md`](ROADMAP.md)).
+- Arbitrary code execution in transforms — only a **whitelist** of declarative ops.
+
+## F4. Functional requirements
+| ID | Requirement |
+|----|-------------|
+| F-FR1 | `POST /v1/pipelines` validates the body, invokes the LLM designer, and returns a `PipelineSpec` + id. |
+| F-FR2 | Ingestion channels are polymorphic (`type: apify | custom-http`) with per-type config. |
+| F-FR3 | The Apify connector supports `run-sync-get-dataset-items` (actor) and dataset-items fetch, Bearer auth. |
+| F-FR4 | Transforms are limited to a safe whitelist: `select_fields`, `rename`, `filter`, `limit`, `dedupe`, `flatten`. |
+| F-FR5 | Dry-run returns at most `sample_size` records (bounded, default 10, max 100) with a timeout. |
+| F-FR6 | LLM output is parsed as JSON and validated against `PipelineSpec`; invalid output → repair or degrade. |
+| F-FR7 | All errors use one envelope `{error: {code, message, detail?}}` with correct HTTP status codes. |
+
+## F5. Non-functional requirements
+| ID | Requirement |
+|----|-------------|
+| F-NFR1 | Secrets (Apify token, LLM key) are **never** stored in a persisted `PipelineSpec` or returned in responses. |
+| F-NFR2 | No arbitrary code exec; connectors enforce sample/timeout caps (SSRF-aware for custom-http). |
+| F-NFR3 | Runtime deps limited to `fastapi`, `pydantic>=2`, `uvicorn`, `httpx`; installed via the `api` extra. |
+| F-NFR4 | Fully testable offline: FastAPI `TestClient`, mocked Apify (`httpx.MockTransport`) and mocked LLM. |
+| F-NFR5 | Type-hinted; ruff-clean; covered by CI. |
+
+## F6. Acceptance criteria
+- [ ] `pip install -e ".[api]"` then `uvicorn near_iron_claw.pipeline.api:app` serves the API + `/docs`.
+- [ ] `POST /v1/pipelines` designs a valid pipeline (LLM mocked in tests; degrades without a key).
+- [ ] Apify + custom-http dry-runs return a bounded sample (mocked upstream in tests).
+- [ ] No secret ever appears in a stored spec or response (asserted in tests).
+- [ ] `pytest` green offline; `ruff check .` clean; `/code-review` + `/security-review` addressed.
