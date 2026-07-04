@@ -20,3 +20,4 @@ htmlcov/
 
 # Claude Code local settings (keep shared config, ignore per-user overrides)
 .claude/settings.local.json
+.vercel
