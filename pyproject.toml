@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "near-iron-claw"
+version = "0.1.0"
+description = "Python client + CLI for NEAR AI Cloud (hosted IronClaw), an OpenAI-compatible LLM gateway."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "edwardplata" }]
+keywords = ["near-ai", "ironclaw", "llm", "openai-compatible", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "httpx>=0.24",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/edwardplata/near-iron-claw"
+"NEAR AI Cloud" = "https://cloud.near.ai"
+
+[project.scripts]
+near-iron-claw = "near_iron_claw.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/near_iron_claw"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "live: tests that hit the real gateway; skipped unless a valid key is configured",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E741"]  # ambiguous var name (we use a local `mark` lambda intentionally)
