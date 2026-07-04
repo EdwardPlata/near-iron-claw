@@ -10,6 +10,13 @@ health check that faithfully distinguishes "gateway reachable" from "key actuall
 
 See [`SPEC.md`](SPEC.md) for the full spec kit and acceptance criteria.
 
+## Documentation
+
+- **[`DOCS.md`](DOCS.md) — full developer guide.** Start here: architecture, a hyperlinked
+  repository map, the data model, local dev, and **how to design and ship a new feature**.
+- [`SPEC.md`](SPEC.md) — requirements & acceptance criteria · [`CONNECTING.md`](CONNECTING.md) —
+  raw connection facts · [`DEPLOY.md`](DEPLOY.md) — the deployed Supabase + Vercel stack.
+
 ## Install
 
 ```bash
