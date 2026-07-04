@@ -5,15 +5,37 @@ Each layer is a middleware: it validates, adds a concern, and forwards.
 
 ```
 Browser (web/index.html)
-   │  POST /api/chat { prompt, session_id }
+   │  POST /api/chat { prompt, session_id }        GET /api/logs
+   ▼                                                 ▼
+Vercel Function  api/chat.js  /  api/logs.js      ← middleware 1: validation, edge proxy
+   │  POST …/functions/v1/chat  (Bearer anon key)   GET …/functions/v1/logs
+   ▼                                                 ▼
+Supabase Edge Function  chat  /  logs             ← middleware 2: holds keys, logs + reads
+   │  POST /v1/chat/completions (Bearer key from app_config, provider fallback chain)
    ▼
-Vercel Function  api/chat.js            ← middleware 1: input validation, edge proxy
-   │  POST …/functions/v1/chat  (Bearer anon key)
-   ▼
-Supabase Edge Function  chat            ← middleware 2: holds the NEAR key, logs turns
-   │  POST /v1/chat/completions (Bearer NEAR key, read from app_config)
-   ▼
-NEAR AI Cloud (OpenAI-compatible gateway)
+LLM providers — NEAR AI Cloud primary + optional fallbacks (all OpenAI-compatible)
+```
+
+### Resilience: fallback chain, logging, graceful degradation
+
+- **Provider fallback** — `app_config.fallback_providers` is an ordered JSONB list of
+  `{ name, base_url, api_key, model }`. The `chat` function tries the primary NEAR AI key
+  first, then each fallback, until one answers. Add any OpenAI-compatible endpoint/key here
+  and it "just works" — no redeploy needed.
+- **Request logging** — every attempt (success or failure, incl. the NEAR AI 401) is written
+  to `request_logs` and exposed read-only via `GET /api/logs` → Supabase `logs` function.
+- **Graceful degradation** — if no provider answers, `chat` returns HTTP **200** with
+  `degraded: true` and an echo of the message (plus the `attempts` detail) instead of a hard
+  error, so the pipeline stays demonstrable with no valid key. The UI renders it as a warning.
+
+### Add a working provider (no redeploy)
+
+```sql
+update public.app_config
+set fallback_providers = '[
+  {"name":"openai","base_url":"https://api.openai.com/v1","api_key":"sk-...","model":"gpt-4o-mini"}
+]'::jsonb
+where id = 1;
 ```
 
 The **Python `near_iron_claw` client** (this repo's core) is the same middleware pattern as a
@@ -45,12 +67,14 @@ The Supabase **anon key** and project URL embedded in `api/chat.js` are *publish
 
 | Path | Role |
 |------|------|
-| `web/index.html` | Chat UI (vanilla JS, no build) |
-| `api/chat.js` | Vercel middleware → Supabase edge function |
+| `web/index.html` | Chat UI + logs panel (vanilla JS, no build) |
+| `api/chat.js` | Vercel middleware → Supabase `chat` edge function |
+| `api/logs.js` | Vercel middleware → Supabase `logs` edge function |
 | `api/health.js` | Readiness probe (checks backend reachability) |
-| `supabase/functions/chat/index.ts` | Edge function → NEAR AI Cloud + persistence |
+| `supabase/functions/chat/index.ts` | Edge fn → provider fallback chain + persistence + logging |
+| `supabase/functions/logs/index.ts` | Edge fn → recent `request_logs` (no secrets) |
 | `vercel.json` | `builds` (static `web/` + Node `api/`) + routes |
-| DB: `app_config`, `sessions`, `messages` | Config + conversation persistence (all RLS-locked) |
+| DB: `app_config`, `sessions`, `messages`, `request_logs` | Config + conversation + attempt logs (all RLS-locked) |
 
 ## Redeploy
 
@@ -78,9 +102,11 @@ update public.app_config set llm_api_key = 'sk-agent-…', updated_at = now() wh
 |-------|--------|
 | `GET /` | 200 (HTML) |
 | `GET /api/health` | 200 `{ backend: "reachable" }` |
-| `POST /api/chat` (valid prompt) | 502 typed key-invalid error through full chain (expired key) |
+| `POST /api/chat` (valid prompt) | 200 graceful `degraded` echo (expired key) + attempt logged |
+| `GET /api/logs` | 200 — shows the NEAR AI 401 + degraded-echo rows |
 | `POST /api/chat` (empty body) | 400 validation |
-| `GET /api/chat` | 405 method guard |
+| `GET /api/chat` / `POST /api/logs` | 405 method guard |
 | unauthenticated edge call | 401 (Supabase `verify_jwt`) |
 | anon read of `app_config` / `messages` | `[]` (RLS locked) |
 | Supabase security advisors | only INFO (intentional RLS-no-policy lock) |
+| `scripts/smoke.sh` | 8/8 passing |

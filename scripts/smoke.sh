@@ -25,10 +25,11 @@ check "GET /  (static frontend)"            200 "$(code "$BASE/")"
 check "GET /api/health"                     200 "$(code "$BASE/api/health")"
 check "POST /api/chat (empty body -> 400)"  400 "$(code -X POST "$BASE/api/chat" -H 'content-type: application/json' -d '{}')"
 check "GET /api/chat (method guard -> 405)" 405 "$(code "$BASE/api/chat")"
-# Full chain: 200 with a valid key, 502 with the expired one — both prove the chain runs.
-chat=$(code -X POST "$BASE/api/chat" -H 'content-type: application/json' -d '{"prompt":"ping","max_tokens":8}')
-case "$chat" in 200|502) printf '  ✅ %-46s %s\n' "POST /api/chat (full chain 200|502)" "$chat"; pass=$((pass+1));;
-  *) printf '  ❌ %-46s got %s\n' "POST /api/chat (full chain)" "$chat"; fail=$((fail+1));; esac
+# Full chain always returns 200 now: a real reply with a valid key, or a graceful
+# degraded echo when every provider fails (the whole pipeline still runs + logs).
+check "POST /api/chat (graceful -> 200)"    200 "$(code -X POST "$BASE/api/chat" -H 'content-type: application/json' -d '{"prompt":"ping","max_tokens":8}')"
+check "GET /api/logs (observability)"       200 "$(code "$BASE/api/logs?limit=5")"
+check "POST /api/logs (method guard -> 405)" 405 "$(code -X POST "$BASE/api/logs")"
 check "Supabase edge fn (no JWT -> 401)"    401 "$(code -X POST "$SUPABASE_FN" -H 'content-type: application/json' -d '{"prompt":"hi"}')"
 
 echo ""

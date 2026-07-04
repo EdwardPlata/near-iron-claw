@@ -7,6 +7,7 @@
   "routes": [
     { "src": "/api/chat", "dest": "/api/chat.js" },
     { "src": "/api/health", "dest": "/api/health.js" },
+    { "src": "/api/logs", "dest": "/api/logs.js" },
     { "handle": "filesystem" },
     { "src": "/", "dest": "/web/index.html" },
     { "src": "/(.*)", "dest": "/web/$1" }

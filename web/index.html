@@ -45,6 +45,28 @@
       .msg.user .bubble { background: var(--user); }
       .msg.assistant .bubble { background: var(--assistant); border: 1px solid var(--border); }
       .msg.error .bubble { background: rgba(255,107,107,.08); border: 1px solid var(--err); color: #ffd3d3; }
+      .msg.degraded .avatar { background: #b8860b; color: white; }
+      .msg.degraded .bubble { background: rgba(255,196,0,.07); border: 1px solid #b8860b; color: #ffe9b0; }
+      button.ghost {
+        background: transparent; border: 1px solid var(--border); color: var(--muted);
+        border-radius: 8px; padding: 5px 12px; font-size: 12px; min-width: 0; font-weight: 550;
+      }
+      button.ghost:hover { color: var(--text); border-color: var(--accent); }
+      #logs-panel {
+        position: fixed; top: 60px; right: 16px; width: min(560px, 92vw); max-height: 62vh;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+        box-shadow: 0 18px 50px rgba(0,0,0,.5); z-index: 20; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .logs-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+      .logs-body { overflow: auto; padding: 8px 0; font-size: 12px; }
+      .log-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.04); }
+      .log-row .pill { font-weight: 700; border-radius: 6px; padding: 1px 7px; text-align: center; font-size: 11px; align-self: start; }
+      .log-row.ok .pill { background: rgba(63,185,80,.15); color: #6ee787; }
+      .log-row.fail .pill { background: rgba(255,107,107,.15); color: #ff9b9b; }
+      .log-row .prov { color: var(--text); font-weight: 600; }
+      .log-row .meta { color: var(--muted); }
+      .log-row .err { color: #ffb3b3; word-break: break-word; margin-top: 3px; }
+      .log-row .when { color: var(--muted); white-space: nowrap; font-size: 11px; }
       .role { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; }
       .empty { text-align: center; color: var(--muted); margin-top: 8vh; }
       .empty h2 { color: var(--text); font-weight: 650; }
@@ -71,8 +93,19 @@
         <div class="sub">Browser → Vercel → Supabase → NEAR AI Cloud</div>
       </div>
       <div class="spacer"></div>
+      <button id="logs-btn" class="ghost" type="button">Logs</button>
       <div id="status"><span class="dot"></span><span id="status-text">checking…</span></div>
     </header>
+
+    <div id="logs-panel" hidden>
+      <div class="logs-head">
+        <strong>Recent upstream attempts</strong>
+        <span class="spacer"></span>
+        <button id="logs-refresh" class="ghost" type="button">Refresh</button>
+        <button id="logs-close" class="ghost" type="button">Close</button>
+      </div>
+      <div id="logs-body" class="logs-body">loading…</div>
+    </div>
 
     <main id="main">
       <div class="wrap">
@@ -147,14 +180,23 @@
             body: JSON.stringify({ prompt, session_id: sessionId }),
           });
           const j = await r.json();
+          const msgEl = bubble.parentElement.parentElement;
           if (!r.ok) {
-            bubble.parentElement.parentElement.className = "msg error";
+            msgEl.className = "msg error";
             bubble.parentElement.querySelector(".role").textContent = "error";
-            bubble.parentElement.parentElement.querySelector(".avatar").textContent = "!";
+            msgEl.querySelector(".avatar").textContent = "!";
             bubble.textContent =
               (j.error || "request failed") + (j.upstream_status ? " (HTTP " + j.upstream_status + ")" : "");
+          } else if (j.degraded) {
+            // No live provider answered — show the echo as a warning, not a failure.
+            msgEl.className = "msg degraded";
+            bubble.parentElement.querySelector(".role").textContent = "degraded · " + (j.provider || "echo");
+            msgEl.querySelector(".avatar").textContent = "⚠";
+            bubble.textContent = j.reply;
+            if (j.session_id) sessionId = j.session_id;
           } else {
             bubble.textContent = j.reply;
+            bubble.parentElement.querySelector(".role").textContent = "assistant · " + (j.provider || "");
             if (j.session_id) sessionId = j.session_id;
             if (j.model) $("model").textContent = j.model;
           }
@@ -165,6 +207,37 @@
           send.disabled = false; input.focus();
         }
       });
+
+      // ---- Logs panel: surfaces recent upstream attempts (incl. provider errors) ----
+      const panel = $("logs-panel"), logsBody = $("logs-body");
+      function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+      async function loadLogs() {
+        logsBody.textContent = "loading…";
+        try {
+          const r = await fetch("/api/logs?limit=25");
+          const j = await r.json();
+          if (!Array.isArray(j.logs) || j.logs.length === 0) { logsBody.textContent = "No attempts logged yet — send a message."; return; }
+          logsBody.innerHTML = j.logs.map((l) => {
+            const ok = l.ok && !l.degraded;
+            const when = new Date(l.created_at).toLocaleTimeString();
+            const status = l.http_status == null ? "—" : l.http_status;
+            const badge = l.degraded ? "DEGR" : ok ? "OK" : "FAIL";
+            return (
+              '<div class="log-row ' + (ok ? "ok" : "fail") + '">' +
+                '<div class="pill">' + badge + "</div>" +
+                "<div><div class=\"prov\">" + esc(l.provider) + ' <span class="meta">· ' + esc(l.model) + "</span></div>" +
+                  '<div class="meta">HTTP ' + status + " · " + (l.latency_ms ?? 0) + "ms</div>" +
+                  (l.error ? '<div class="err">' + esc(l.error) + "</div>" : "") +
+                "</div>" +
+                '<div class="when">' + when + "</div>" +
+              "</div>"
+            );
+          }).join("");
+        } catch (e) { logsBody.textContent = "failed to load logs: " + e.message; }
+      }
+      $("logs-btn").addEventListener("click", () => { panel.hidden = !panel.hidden; if (!panel.hidden) loadLogs(); });
+      $("logs-refresh").addEventListener("click", loadLogs);
+      $("logs-close").addEventListener("click", () => { panel.hidden = true; });
     </script>
   </body>
 </html>
