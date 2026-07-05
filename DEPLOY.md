@@ -76,6 +76,23 @@ The Supabase **anon key** and project URL embedded in `api/chat.js` are *publish
 | `vercel.json` | `builds` (static `web/` + Node `api/`) + routes |
 | DB: `app_config`, `sessions`, `messages`, `request_logs` | Config + conversation + attempt logs (all RLS-locked) |
 
+## Run the frontend locally
+
+`web/index.html` calls `/api/chat`, `/api/logs`, `/api/health`, which are **Vercel
+functions** — so a plain static server (or `open index.html`) 404s on those. Two options:
+
+```bash
+# Option A — zero-dependency dev server (serves web/ + runs api/*.js locally):
+node scripts/dev-frontend.mjs          # → http://localhost:3000   (PORT=4000 to change)
+
+# Option B — the Vercel CLI emulator:
+vercel dev --scope edwardplatas-projects
+```
+
+Both run the middleware functions locally and forward to the **deployed** Supabase backend
+(no local Supabase needed). Chat shows the degraded reply until a valid NEAR AI key is set in
+`app_config` (see below).
+
 ## Redeploy
 
 ```bash
