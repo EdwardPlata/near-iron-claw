@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>near-iron-claw · NEAR AI Cloud chat</title>
+    <style>
+      :root {
+        --bg: #0b0f17; --panel: #131a26; --panel-2: #1b2434; --border: #263143;
+        --text: #e6edf6; --muted: #8b98ab; --accent: #4f9cff; --accent-2: #7c5cff;
+        --user: #1f2b3d; --assistant: #16202f; --err: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(1200px 600px at 70% -10%, #16213a, transparent), var(--bg);
+        color: var(--text); height: 100vh; display: flex; flex-direction: column;
+      }
+      header {
+        padding: 14px 20px; border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 12px; background: var(--panel);
+      }
+      header .logo {
+        width: 30px; height: 30px; border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: grid; place-items: center; font-weight: 800; color: white;
+      }
+      header h1 { font-size: 15px; margin: 0; font-weight: 650; }
+      header .sub { color: var(--muted); font-size: 12px; }
+      header .spacer { flex: 1; }
+      #status { font-size: 12px; color: var(--muted); }
+      #status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
+      #status.ok .dot { background: #3fb950; } #status.bad .dot { background: var(--err); }
+      main { flex: 1; overflow-y: auto; padding: 22px 0; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+      .msg { display: flex; gap: 12px; margin: 0 0 18px; }
+      .msg .avatar {
+        flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+        font-size: 13px; font-weight: 700;
+      }
+      .msg.user .avatar { background: var(--accent); color: white; }
+      .msg.assistant .avatar { background: var(--panel-2); border: 1px solid var(--border); }
+      .msg.error .avatar { background: var(--err); color: white; }
+      .bubble { padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
+      .msg.user .bubble { background: var(--user); }
+      .msg.assistant .bubble { background: var(--assistant); border: 1px solid var(--border); }
+      .msg.error .bubble { background: rgba(255,107,107,.08); border: 1px solid var(--err); color: #ffd3d3; }
+      .msg.degraded .avatar { background: #b8860b; color: white; }
+      .msg.degraded .bubble { background: rgba(255,196,0,.07); border: 1px solid #b8860b; color: #ffe9b0; }
+      button.ghost {
+        background: transparent; border: 1px solid var(--border); color: var(--muted);
+        border-radius: 8px; padding: 5px 12px; font-size: 12px; min-width: 0; font-weight: 550;
+      }
+      button.ghost:hover { color: var(--text); border-color: var(--accent); }
+      #logs-panel {
+        position: fixed; top: 60px; right: 16px; width: min(560px, 92vw); max-height: 62vh;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+        box-shadow: 0 18px 50px rgba(0,0,0,.5); z-index: 20; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .logs-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+      .logs-body { overflow: auto; padding: 8px 0; font-size: 12px; }
+      .log-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.04); }
+      .log-row .pill { font-weight: 700; border-radius: 6px; padding: 1px 7px; text-align: center; font-size: 11px; align-self: start; }
+      .log-row.ok .pill { background: rgba(63,185,80,.15); color: #6ee787; }
+      .log-row.fail .pill { background: rgba(255,107,107,.15); color: #ff9b9b; }
+      .log-row .prov { color: var(--text); font-weight: 600; }
+      .log-row .meta { color: var(--muted); }
+      .log-row .err { color: #ffb3b3; word-break: break-word; margin-top: 3px; }
+      .log-row .when { color: var(--muted); white-space: nowrap; font-size: 11px; }
+      .role { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; }
+      .empty { text-align: center; color: var(--muted); margin-top: 8vh; }
+      .empty h2 { color: var(--text); font-weight: 650; }
+      footer { border-top: 1px solid var(--border); background: var(--panel); padding: 14px 0; }
+      form { max-width: 760px; margin: 0 auto; padding: 0 20px; display: flex; gap: 10px; }
+      textarea {
+        flex: 1; resize: none; background: var(--panel-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; font: inherit; max-height: 160px;
+      }
+      textarea:focus { outline: none; border-color: var(--accent); }
+      button {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; border: 0;
+        border-radius: 10px; padding: 0 18px; font-weight: 650; cursor: pointer; min-width: 84px;
+      }
+      button:disabled { opacity: .5; cursor: default; }
+      .hint { max-width: 760px; margin: 8px auto 0; padding: 0 20px; color: var(--muted); font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">IC</div>
+      <div>
+        <h1>near-iron-claw</h1>
+        <div class="sub">Browser → Vercel → Supabase → NEAR AI Cloud</div>
+      </div>
+      <div class="spacer"></div>
+      <button id="logs-btn" class="ghost" type="button">Logs</button>
+      <div id="status"><span class="dot"></span><span id="status-text">checking…</span></div>
+    </header>
+
+    <div id="logs-panel" hidden>
+      <div class="logs-head">
+        <strong>Recent upstream attempts</strong>
+        <span class="spacer"></span>
+        <button id="logs-refresh" class="ghost" type="button">Refresh</button>
+        <button id="logs-close" class="ghost" type="button">Close</button>
+      </div>
+      <div id="logs-body" class="logs-body">loading…</div>
+    </div>
+
+    <main id="main">
+      <div class="wrap">
+        <div class="empty" id="empty">
+          <h2>Chat through the full middleware chain</h2>
+          <p>Every message is validated at the Vercel edge, proxied by a Supabase<br />
+          function that holds the key, and answered by NEAR AI Cloud.</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <form id="form">
+        <textarea id="input" rows="1" placeholder="Send a message…" autofocus></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+      <div class="hint">Model: <span id="model">anthropic/claude-sonnet-4-6</span> · session persisted in Supabase</div>
+    </footer>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const main = $("main").querySelector(".wrap");
+      const form = $("form"), input = $("input"), send = $("send");
+      let sessionId = null;
+
+      // Auto-grow textarea + submit on Enter (Shift+Enter = newline).
+      input.addEventListener("input", () => {
+        input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px";
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+      });
+
+      function addMsg(role, text) {
+        const empty = $("empty"); if (empty) empty.remove();
+        const el = document.createElement("div");
+        el.className = "msg " + role;
+        const initials = role === "user" ? "You" : role === "error" ? "!" : "AI";
+        el.innerHTML =
+          '<div class="avatar"></div><div><div class="role"></div><div class="bubble"></div></div>';
+        el.querySelector(".avatar").textContent = initials;
+        el.querySelector(".role").textContent = role;
+        el.querySelector(".bubble").textContent = text;
+        main.appendChild(el);
+        $("main").scrollTop = $("main").scrollHeight;
+        return el.querySelector(".bubble");
+      }
+
+      async function health() {
+        try {
+          const r = await fetch("/api/health");
+          const j = await r.json();
+          const ok = j.backend === "reachable";
+          $("status").className = ok ? "ok" : "bad";
+          $("status-text").textContent = ok ? "backend reachable" : "backend: " + j.backend;
+        } catch { $("status").className = "bad"; $("status-text").textContent = "offline"; }
+      }
+      health();
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const prompt = input.value.trim();
+        if (!prompt) return;
+        addMsg("user", prompt);
+        input.value = ""; input.style.height = "auto";
+        send.disabled = true;
+        const bubble = addMsg("assistant", "…");
+        try {
+          const r = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, session_id: sessionId }),
+          });
+          const j = await r.json();
+          const msgEl = bubble.parentElement.parentElement;
+          if (!r.ok) {
+            msgEl.className = "msg error";
+            bubble.parentElement.querySelector(".role").textContent = "error";
+            msgEl.querySelector(".avatar").textContent = "!";
+            bubble.textContent =
+              (j.error || "request failed") + (j.upstream_status ? " (HTTP " + j.upstream_status + ")" : "");
+          } else if (j.degraded) {
+            // No live provider answered — show the echo as a warning, not a failure.
+            msgEl.className = "msg degraded";
+            bubble.parentElement.querySelector(".role").textContent = "degraded · " + (j.provider || "echo");
+            msgEl.querySelector(".avatar").textContent = "⚠";
+            bubble.textContent = j.reply;
+            if (j.session_id) sessionId = j.session_id;
+          } else {
+            bubble.textContent = j.reply;
+            bubble.parentElement.querySelector(".role").textContent = "assistant · " + (j.provider || "");
+            if (j.session_id) sessionId = j.session_id;
+            if (j.model) $("model").textContent = j.model;
+          }
+        } catch (err) {
+          bubble.parentElement.parentElement.className = "msg error";
+          bubble.textContent = "network error: " + err.message;
+        } finally {
+          send.disabled = false; input.focus();
+        }
+      });
+
+      // ---- Logs panel: surfaces recent upstream attempts (incl. provider errors) ----
+      const panel = $("logs-panel"), logsBody = $("logs-body");
+      function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+      async function loadLogs() {
+        logsBody.textContent = "loading…";
+        try {
+          const r = await fetch("/api/logs?limit=25");
+          const j = await r.json();
+          if (!Array.isArray(j.logs) || j.logs.length === 0) { logsBody.textContent = "No attempts logged yet — send a message."; return; }
+          logsBody.innerHTML = j.logs.map((l) => {
+            const ok = l.ok && !l.degraded;
+            const when = new Date(l.created_at).toLocaleTimeString();
+            const status = l.http_status == null ? "—" : l.http_status;
+            const badge = l.degraded ? "DEGR" : ok ? "OK" : "FAIL";
+            return (
+              '<div class="log-row ' + (ok ? "ok" : "fail") + '">' +
+                '<div class="pill">' + badge + "</div>" +
+                "<div><div class=\"prov\">" + esc(l.provider) + ' <span class="meta">· ' + esc(l.model) + "</span></div>" +
+                  '<div class="meta">HTTP ' + status + " · " + (l.latency_ms ?? 0) + "ms</div>" +
+                  (l.error ? '<div class="err">' + esc(l.error) + "</div>" : "") +
+                "</div>" +
+                '<div class="when">' + when + "</div>" +
+              "</div>"
+            );
+          }).join("");
+        } catch (e) { logsBody.textContent = "failed to load logs: " + e.message; }
+      }
+      $("logs-btn").addEventListener("click", () => { panel.hidden = !panel.hidden; if (!panel.hidden) loadLogs(); });
+      $("logs-refresh").addEventListener("click", loadLogs);
+      $("logs-close").addEventListener("click", () => { panel.hidden = true; });
+    </script>
+  </body>
+</html>

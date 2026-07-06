@@ -1,0 +1,24 @@
+# Vercel deploys only the web frontend (web/) + serverless middleware (api/).
+# Exclude the Python package and all its tooling so Vercel doesn't try to build it.
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+src/
+tests/
+pyproject.toml
+
+supabase/
+.github/
+
+# Docs / meta not needed at runtime
+SPEC.md
+CONNECTING.md
+.claude/
