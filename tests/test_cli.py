@@ -9,9 +9,7 @@ import pytest
 
 from near_iron_claw import NearAIClient, Settings
 from near_iron_claw import cli as cli_mod
-
-MODELS_BODY = {"data": [{"id": "openai/gpt-5.5"}, {"id": "anthropic/claude-opus-4-7"}]}
-REAL_KEY = "sk-agent-realkey0000000000000000000000"
+from testkit import MODELS_BODY, REAL_KEY, chat_response
 
 
 @pytest.fixture(autouse=True)
@@ -73,7 +71,7 @@ def test_models_command(monkeypatch, capsys):
 
 def test_chat_command(monkeypatch, capsys):
     def handler(request):
-        return httpx.Response(200, json={"choices": [{"message": {"content": "hello!"}}]})
+        return httpx.Response(200, json=chat_response("hello!"))
 
     patch_transport(monkeypatch, handler)
     rc = cli_mod.main(["chat", "say hi"])
@@ -86,7 +84,7 @@ def test_chat_reads_stdin(monkeypatch, capsys):
 
     def handler(request):
         assert "piped prompt" in request.read().decode()
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+        return httpx.Response(200, json=chat_response("ok"))
 
     patch_transport(monkeypatch, handler)
     assert cli_mod.main(["chat"]) == 0
@@ -103,7 +101,7 @@ def test_chat_empty_prompt_errors(monkeypatch, capsys):
 def test_verify_command_success(monkeypatch, capsys):
     def handler(request):
         if request.url.path.endswith("/chat/completions"):
-            return httpx.Response(200, json={"choices": [{"message": {"content": "pong"}}]})
+            return httpx.Response(200, json=chat_response("pong"))
         return httpx.Response(200, json=MODELS_BODY)
 
     patch_transport(monkeypatch, handler)

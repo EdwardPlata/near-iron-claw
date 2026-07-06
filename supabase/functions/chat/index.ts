@@ -16,35 +16,10 @@
 // verify_jwt is enabled: callers present a valid Supabase JWT (Vercel forwards
 // the anon key).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { db, json as _json, makeCors } from "../_shared/runtime.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
-}
-
-// PostgREST call with the service role (bypasses RLS on app_config/messages/logs).
-function db(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_ROLE,
-      Authorization: `Bearer ${SERVICE_ROLE}`,
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
-}
+const CORS = makeCors("POST, OPTIONS");
+const json = (body: unknown, status = 200): Response => _json(CORS, body, status);
 
 interface ChatMessage {
   role: string;

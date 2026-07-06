@@ -8,14 +8,12 @@ from __future__ import annotations
 
 import httpx
 
-from near_iron_claw import NearAIClient, Settings
+from testkit import MODELS_BODY, chat_response
+from testkit import mock_client as _client
 
-MODELS_BODY = {"data": [{"id": "openai/gpt-5.5"}, {"id": "anthropic/claude-opus-4-7"}]}
-CHAT_OK = {"choices": [{"message": {"content": "pong"}}]}
+CHAT_OK = chat_response("pong")
 
-
-def _client(handler, *, key="sk-agent-realkey0000000000000000"):
-    return NearAIClient(Settings(api_key=key), transport=httpx.MockTransport(handler))
+MODEL_COUNT = len(MODELS_BODY["data"])
 
 
 def _route(request: httpx.Request) -> httpx.Response:
@@ -30,7 +28,7 @@ def test_verify_ok_when_key_valid():
     assert result.ok is True
     assert result.gateway_reachable is True
     assert result.key_valid is True
-    assert result.model_count == 2
+    assert result.model_count == MODEL_COUNT
 
 
 def test_verify_reachable_but_key_invalid():
@@ -45,7 +43,7 @@ def test_verify_reachable_but_key_invalid():
     assert result.gateway_reachable is True
     assert result.key_valid is False
     assert result.ok is False
-    assert result.model_count == 2  # still reported informationally
+    assert result.model_count == MODEL_COUNT  # still reported informationally
     assert result.errors
 
 

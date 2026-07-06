@@ -23,20 +23,25 @@ from pydantic import BaseModel, Field
 # --------------------------------------------------------------------------- #
 
 
-class ApifyActorChannel(BaseModel):
+class _ApifyChannel(BaseModel):
+    """Shared base for Apify channels — carries the (secret) token field.
+    Does NOT declare ``type`` so each leaf keeps its own discriminator literal."""
+
+    apify_token: Optional[str] = Field(default=None, description="Secret — not stored/echoed")
+
+
+class ApifyActorChannel(_ApifyChannel):
     type: Literal["apify-actor"] = "apify-actor"
     actor_id: str = Field(..., description="Apify actor slug, e.g. 'apify/web-scraper'")
     run_input: dict[str, Any] = Field(default_factory=dict, description="Actor input JSON")
-    apify_token: Optional[str] = Field(default=None, description="Secret — not stored/echoed")
 
     def public(self) -> dict[str, Any]:
         return {"type": self.type, "actor_id": self.actor_id, "run_input": self.run_input}
 
 
-class ApifyDatasetChannel(BaseModel):
+class ApifyDatasetChannel(_ApifyChannel):
     type: Literal["apify-dataset"] = "apify-dataset"
     dataset_id: str = Field(..., description="Apify dataset id")
-    apify_token: Optional[str] = Field(default=None, description="Secret — not stored/echoed")
 
     def public(self) -> dict[str, Any]:
         return {"type": self.type, "dataset_id": self.dataset_id}
@@ -78,7 +83,7 @@ def channel_public(channel: Channel) -> dict[str, Any]:
 
 def channel_secrets(channel: Channel) -> dict[str, Any]:
     """Extract the transient secrets a connector needs (never stored)."""
-    if isinstance(channel, (ApifyActorChannel, ApifyDatasetChannel)):
+    if isinstance(channel, _ApifyChannel):
         return {"apify_token": channel.apify_token}
     if isinstance(channel, CustomHttpChannel):
         return {"headers": channel.headers}

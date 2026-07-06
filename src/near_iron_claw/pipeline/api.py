@@ -179,12 +179,17 @@ def list_pipelines(store: PipelineStore = Depends(get_store)) -> PipelineList:
     return PipelineList(items=items, count=len(items))
 
 
-@app.get("/v1/pipelines/{pipeline_id}", response_model=Pipeline)
-def get_pipeline(pipeline_id: str, store: PipelineStore = Depends(get_store)) -> Pipeline:
+def _require_pipeline(store: PipelineStore, pipeline_id: str) -> Pipeline:
+    """Fetch a pipeline or raise a 404 (shared by the get + dry-run routes)."""
     pipeline = store.get(pipeline_id)
     if pipeline is None:
         raise StarletteHTTPException(status_code=404, detail=f"pipeline {pipeline_id} not found")
     return pipeline
+
+
+@app.get("/v1/pipelines/{pipeline_id}", response_model=Pipeline)
+def get_pipeline(pipeline_id: str, store: PipelineStore = Depends(get_store)) -> Pipeline:
+    return _require_pipeline(store, pipeline_id)
 
 
 @app.post("/v1/pipelines/{pipeline_id}/dry-run", response_model=DryRunResponse)
@@ -194,9 +199,7 @@ def dry_run(
     store: PipelineStore = Depends(get_store),
     http: httpx.Client = Depends(get_connector_http),
 ) -> DryRunResponse:
-    pipeline = store.get(pipeline_id)
-    if pipeline is None:
-        raise StarletteHTTPException(status_code=404, detail=f"pipeline {pipeline_id} not found")
+    pipeline = _require_pipeline(store, pipeline_id)
 
     channel = _rebuild_channel(pipeline.channel, body)
     secrets = channel_secrets(channel)

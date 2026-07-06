@@ -16,18 +16,8 @@ from near_iron_claw import (
     RateLimitError,
     Settings,
 )
-
-MODELS_BODY = {
-    "data": [
-        {"id": "openai/gpt-5.5"},
-        {"id": "anthropic/claude-opus-4-7"},
-        {"id": "deepseek/deepseek-v3.2"},
-    ]
-}
-
-
-def _chat_response(content: str) -> dict:
-    return {"choices": [{"message": {"role": "assistant", "content": content}}]}
+from testkit import MODELS_BODY
+from testkit import chat_response as _chat_response
 
 
 def test_list_models_sorted(make_client):
