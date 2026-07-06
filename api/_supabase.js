@@ -13,9 +13,16 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1ZXNvcnVwaXR6bWp1YmJ5bHhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMTcwMDIsImV4cCI6MjA5ODY5MzAwMn0.tZCep8kG-Ftjb2_uVubvUOFV3NxmNfMl4YEcsMWFwz4";
 
+// Per-function full-URL overrides (backward-compatible with the documented env
+// vars in DEPLOY.md / DOCS.md). A full override wins over the derived base URL.
+const FULL_URL_OVERRIDES = {
+  chat: process.env.SUPABASE_FUNCTION_URL,
+  logs: process.env.SUPABASE_LOGS_URL,
+};
+
 // URL of a named Supabase edge function (e.g. functionUrl("chat")).
 function functionUrl(name) {
-  return `${BASE_URL}/${name}`;
+  return FULL_URL_OVERRIDES[name] || `${BASE_URL}/${name}`;
 }
 
 // Read and JSON-parse the request body (bounded to guard against huge payloads).
@@ -24,7 +31,7 @@ function readJsonBody(req) {
     let data = "";
     req.on("data", (chunk) => {
       data += chunk;
-      if (data.length > 1_000_000) reject(new Error("payload too large")); // 1MB guard
+      if (data.length > 1_000_000) reject(new Error("invalid request body: payload too large")); // 1MB
     });
     req.on("end", () => {
       try {
